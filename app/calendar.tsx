@@ -1,5 +1,4 @@
 import { useState } from "react";
-
 import {
   View,
   Text,
@@ -7,18 +6,23 @@ import {
   FlatList,
   ActivityIndicator,
   Pressable,
-  Modal,
-  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { FilterTabs } from "@/features/todos/components/FilterTabs";
 import type { Todo } from "@/types/todo";
+
+
 import { TodoCard } from "@/Components/TodoCard";
-import { ResourceSavingView } from "@react-navigation/elements";
+import { AddTodoModal } from "@/Components/AddTodoModal";
+import {
+  useAddTodoMutation,
+  useDeleteTodoMutation,
+  useTodosQuery,
+  useToggleTodoMutation,
+} from "@/features/todos/hooks";
 
 export default function CalendarScreen() {
-  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -31,21 +35,15 @@ export default function CalendarScreen() {
     setDescription("");
   };
 
-  async function fetchTodos(): Promise<Todo[]> {
-    const res = await fetch(`http://localhost:4000/todos`);
-    if (!res.ok) throw new Error("Failed to fetch todos");
-    return res.json();
-  }
-
   const {
     data: todos = [],
     isLoading,
     isError,
     error,
-  } = useQuery({
-    queryKey: ["todos"],
-    queryFn: fetchTodos,
-  });
+  } = useTodosQuery();
+  const addTodoMutation = useAddTodoMutation();
+  const deleteTodoMutation = useDeleteTodoMutation();
+  const toggleTodoMutation = useToggleTodoMutation();
 
   const activeCount = todos.filter((t) => !t.completed).length;
   const completedCount = todos.filter((t) => t.completed).length;
@@ -62,59 +60,6 @@ export default function CalendarScreen() {
       : filter === "active"
       ? "No active tasks."
       : "No completed tasks.";
-
-  const addTodoMutation = useMutation({
-    mutationFn: async ({
-      title,
-      description,
-    }: {
-      title: string;
-      description: string;
-    }) => {
-      const response = await fetch(`http://localhost:4000/todos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, completed: false }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to add todo");
-      }
-      return response.json() as Promise<Todo>;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
-    },
-  });
-
-  const deleteTodoMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`http://localhost:4000/todos/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete todo");
-      return id;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
-    },
-  });
-
-  const toggleTodoMutation = useMutation({
-    mutationFn: async (todo: Todo) => {
-      const updatedCompleted = !todo.completed;
-      const res = await fetch(`http://localhost:4000/todos/${todo.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: updatedCompleted }),
-      });
-      if (!res.ok) throw new Error("Failed to update todo");
-      return { ...todo, completed: updatedCompleted };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
-    },
-  });
 
   function handleDeleteTodo(id: number) {
     deleteTodoMutation.mutate(id, {
@@ -151,58 +96,13 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <View style={styles.filterRow}>
-          <Pressable
-            style={[
-              styles.filterButton,
-              filter === "all" && styles.filterButtonActive,
-            ]}
-            onPress={() => setFilter("all")}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                filter === "all" && styles.filterTextActive,
-              ]}
-            >
-              {`All (${todos.length})`}
-            </Text>
-          </Pressable>
+        <FilterTabs
+  filter={filter}
+  counts={{ all: todos.length, active: activeCount, completed: completedCount }}
+  onChange={setFilter}
+/>
 
-          <Pressable
-            style={[
-              styles.filterButton,
-              filter === "active" && styles.filterButtonActive,
-            ]}
-            onPress={() => setFilter("active")}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                filter === "active" && styles.filterTextActive,
-              ]}
-            >
-              {`Active (${activeCount})`}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.filterButton,
-              filter === "completed" && styles.filterButtonActive,
-            ]}
-            onPress={() => setFilter("completed")}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                filter === "completed" && styles.filterTextActive,
-              ]}
-            >
-              {`Completed (${completedCount})`}
-            </Text>
-          </Pressable>
-        </View>
+          
         <View>
           <Text style={styles.title}>Calendar / To-Do Page</Text>
           <Text style={styles.subtitle}>Your tasks for today</Text>
@@ -247,51 +147,17 @@ export default function CalendarScreen() {
         )}
       </View>
 
-      <Modal
-        visible={isModalOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add New Todo</Text>
+      <AddTodoModal
+  visible={isModalOpen}
+  titleValue={title}
+  descriptionValue={description}
+  onChangeTitle={setTitle}
+  onChangeDescription={setDescription}
+  onSubmit={handleAddTodo}
+  onCancel={closeModal}
+  disabled={!(title.trim() && description.trim())}
+/>
 
-            <Text style={styles.inputLabel}>Title*</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter todo title"
-              value={title}
-              onChangeText={setTitle}
-            />
-
-            <Text style={styles.inputLabel}>Description*</Text>
-            <TextInput
-              style={[styles.input, styles.descriptionInput]}
-              placeholder="Enter todo description"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-            />
-
-            <View style={styles.modalActions}>
-              <Pressable style={styles.cancelButton} onPress={closeModal}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.primaryButton,
-                  !(title.trim() && description.trim()) && { opacity: 0.6 },
-                ]}
-                disabled={!(title.trim() && description.trim())}
-                onPress={handleAddTodo}
-              >
-                <Text style={styles.primaryText}>Add Todo</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -306,32 +172,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#1f1f1f",
   },
-  filterRow: {
-    flexDirection: "row",
-    paddingHorizontal: 24,
-    marginBottom: 16,
-    gap: 8,
-  },
-  filterButton: {
-    flex: 1,
-    paddingVertical: 20,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderColor: "#dcdfe6",
-    alignItems: "center",
-  },
-  filterButtonActive: {
-    backgroundColor: "#247bff",
-    borderColor: "#247bff",
-  },
-  filterText: {
-    fontSize: 14,
-    color: "#5c5c5c",
-    fontWeight: "600",
-  },
-  filterTextActive: {
-    color: "#fff",
-  },
+  
 
   subtitle: {
     marginTop: 4,
@@ -376,65 +217,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: "#5c5c5c",
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#dcdfe6",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-  },
-  descriptionInput: {
-    minHeight: 90,
-    textAlignVertical: "top",
-  },
-  modalActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  cancelText: {
-    color: "#1f1f1f",
-    fontWeight: "600",
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: "#247bff",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  primaryText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
+
 });
