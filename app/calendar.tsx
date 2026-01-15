@@ -1,13 +1,9 @@
+import styles from "./calendar.styles";
 import { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  ActivityIndicator,
-  Pressable,
-} from "react-native";
+import { View, Text, FlatList, ActivityIndicator, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { useForm, Controller } from "react-hook-form";
 
 import { FilterTabs } from "@/features/todos/components/FilterTabs";
 import type { Todo } from "@/types/todo";
@@ -22,17 +18,29 @@ import {
   useToggleTodoMutation,
 } from "@/features/todos/hooks";
 
+
+ export type TodoFormValues = {
+  title: string;
+  description: string;
+};
+
+
+
 export default function CalendarScreen() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  
+  const { control, handleSubmit, reset, watch } = useForm({
+    defaultValues:{ title:"", description:"" }
+  }) 
+
+  const titleValue = watch("title");
+  const descriptionValue = watch("description")
 
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setTitle("");
-    setDescription("");
+    reset();
   };
 
   const {
@@ -77,7 +85,8 @@ export default function CalendarScreen() {
     });
   }
 
-  function handleAddTodo() {
+  function handleAddTodo(values: TodoFormValues) {
+    const {title, description } =values;
     if (!(title.trim() && description.trim())) return;
 
     addTodoMutation.mutate(
@@ -148,74 +157,13 @@ export default function CalendarScreen() {
       </View>
 
       <AddTodoModal
-  visible={isModalOpen}
-  titleValue={title}
-  descriptionValue={description}
-  onChangeTitle={setTitle}
-  onChangeDescription={setDescription}
-  onSubmit={handleAddTodo}
-  onCancel={closeModal}
-  disabled={!(title.trim() && description.trim())}
-/>
+        visible={isModalOpen}
+        control={control}
+        onSubmit={handleSubmit(handleAddTodo)}
+        onCancel={closeModal}
+        disabled={!(titleValue.trim() && descriptionValue.trim())}
+      />
 
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f5f6fa",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "#1f1f1f",
-  },
-  
-
-  subtitle: {
-    marginTop: 4,
-    fontSize: 16,
-    color: "#5c5c5c",
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  listContainer: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  listContent: {
-    paddingBottom: 24,
-  },
-  emptyListContent: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyText: {
-    fontSize: 16,
-    color: "#5c5c5c",
-  },
-  errorText: {
-    color: "#e74c3c",
-    textAlign: "center",
-  },
-  addButton: {
-    backgroundColor: "#247bff",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  addButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-
-});

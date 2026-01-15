@@ -1,3 +1,4 @@
+import { Controller, Control } from "react-hook-form";
 import {
   Modal,
   Pressable,
@@ -7,12 +8,11 @@ import {
   StyleSheet,
 } from "react-native";
 
+import type { TodoFormValues } from "@/app/calendar";
+
 type AddTodoModalProps = {
   visible: boolean;
-  titleValue: string;
-  descriptionValue: string;
-  onChangeTitle: (text: string) => void;
-  onChangeDescription: (text: string) => void;
+  control: Control<TodoFormValues>;
   onSubmit: () => void;
   onCancel: () => void;
   disabled?: boolean;
@@ -20,10 +20,7 @@ type AddTodoModalProps = {
 
 export function AddTodoModal({
   visible,
-  titleValue,
-  descriptionValue,
-  onChangeTitle,
-  onChangeDescription,
+  control,
   onSubmit,
   onCancel,
   disabled = false,
@@ -40,20 +37,33 @@ export function AddTodoModal({
           <Text style={styles.modalTitle}>Add New Todo</Text>
 
           <Text style={styles.inputLabel}>Title*</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter todo title"
-            value={titleValue}
-            onChangeText={onChangeTitle}
+          <Controller
+            control={control}
+            name="title"
+            rules={{ required: true }}
+            render={({ field: { value, onChange } }) => (
+              <TextInput
+                style={styles.input}
+                placeholder="Enter todo title"
+                value={value}
+                onChangeText={onChange}
+              />
+            )}
           />
 
-          <Text style={styles.inputLabel}>Description*</Text>
-          <TextInput
-            style={[styles.input, styles.descriptionInput]}
-            placeholder="Enter todo description"
-            value={descriptionValue}
-            onChangeText={onChangeDescription}
-            multiline
+          <Controller
+            control={control}
+            name="description"
+            rules={{ required: true }}
+            render={({ field: { value, onChange } }) => (
+              <TextInput
+                style={[styles.input, styles.descriptionInput]}
+                placeholder="Enter todo description"
+                value={value}
+                onChangeText={onChange}
+                multiline
+              />
+            )}
           />
 
           <View style={styles.modalActions}>
@@ -61,9 +71,7 @@ export function AddTodoModal({
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
             <Pressable
-              style={[
-                styles.primaryButton,
-                disabled && {opacity: 0.6}]}
+              style={[styles.primaryButton, disabled && { opacity: 0.6 }]}
               disabled={disabled}
               onPress={onSubmit}
             >
@@ -76,10 +84,8 @@ export function AddTodoModal({
   );
 }
 
-
 const styles = StyleSheet.create({
- 
-    modalBackdrop: {
+  modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "flex-end",
